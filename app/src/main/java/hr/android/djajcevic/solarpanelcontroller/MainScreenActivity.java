@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider;
@@ -52,6 +53,8 @@ public class MainScreenActivity extends IOIOActivity {
      * The instance of the {@link hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider} for this activity.
      */
     private SystemUiHider mSystemUiHider;
+
+    private Button button_;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +123,7 @@ public class MainScreenActivity extends IOIOActivity {
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
         findViewById(hr.android.djajcevic.solarpanelcontroller.R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
+        button_ = (Button) findViewById(R.id.button);
     }
 
     @Override
@@ -204,7 +208,7 @@ public class MainScreenActivity extends IOIOActivity {
          */
         @Override
         public void loop() throws ConnectionLostException, InterruptedException {
-//            led_.write(!button_.isChecked());
+            led_.write(!button_.isPressed());
             Thread.sleep(100);
         }
 

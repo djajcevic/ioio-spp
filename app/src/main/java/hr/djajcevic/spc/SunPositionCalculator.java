@@ -266,7 +266,7 @@ public class SunPositionCalculator {
 
     }
 
-    public static int spa_calculate(SunPositionData spa) {
+    public static int calculateSunPosition(SunPositionData spa) {
         int result;
 
         spa.jd = julian_day(spa.year, spa.month, spa.day, spa.hour,
@@ -499,7 +499,7 @@ public class SunPositionCalculator {
         spa.elevation = 200;
         spa.pressure = 820;
 
-        spa_calculate(spa);
+        calculateSunPosition(spa);
 
         Calendar calendar = GregorianCalendar.getInstance();
         TimeZone aDefault = TimeZone.getDefault();

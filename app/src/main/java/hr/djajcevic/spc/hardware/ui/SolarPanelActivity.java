@@ -19,6 +19,9 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import hr.android.djajcevic.solarpanelcontroller.R;
+import ioio.lib.api.IOIO;
+import ioio.lib.api.exception.ConnectionLostException;
+import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.IOIOLooperProvider;
 import ioio.lib.util.android.IOIOActivity;
@@ -224,6 +227,31 @@ public class SolarPanelActivity extends ActionBarActivity implements ActionBar.T
     @Override
     public IOIOLooper createIOIOLooper(String connectionType, Object extra) {
         return new SolarPanelPositionController(this);
+    }
+
+    public static void main(String[] args) {
+//        /dev/tty.usbmodem1421
+        IOIOAndroidApplicationHelper helper = new IOIOAndroidApplicationHelper(null, new IOIOLooperProvider() {
+            @Override
+            public IOIOLooper createIOIOLooper(String connectionType, Object extra) {
+                return new BaseIOIOLooper() {
+                    @Override
+                    protected void setup() throws ConnectionLostException, InterruptedException {
+                        System.out.println(String.format("%s\n" +
+                                        "IOIOLib: %s\n" +
+                                        "Application firmware: %s\n" +
+                                        "Bootloader firmware: %s\n" +
+                                        "Hardware: %s",
+                                "Connection established",
+                                ioio_.getImplVersion(IOIO.VersionType.IOIOLIB_VER),
+                                ioio_.getImplVersion(IOIO.VersionType.APP_FIRMWARE_VER),
+                                ioio_.getImplVersion(IOIO.VersionType.BOOTLOADER_VER),
+                                ioio_.getImplVersion(IOIO.VersionType.HARDWARE_VER)));
+                    }
+                };
+            }
+        });
+
     }
 
 
