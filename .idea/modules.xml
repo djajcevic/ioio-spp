@@ -4,9 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/SolarPanelController.iml" filepath="$PROJECT_DIR$/SolarPanelController.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/iOIOLibAccessory/iOIOLibAccessory.iml" filepath="$PROJECT_DIR$/iOIOLibAccessory/iOIOLibAccessory.iml" />
-      <module fileurl="file://$PROJECT_DIR$/iOIOLibAndroid/iOIOLibAndroid.iml" filepath="$PROJECT_DIR$/iOIOLibAndroid/iOIOLibAndroid.iml" />
     </modules>
   </component>
 </project>
-

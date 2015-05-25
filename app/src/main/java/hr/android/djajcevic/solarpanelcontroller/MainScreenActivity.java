@@ -55,6 +55,7 @@ public class MainScreenActivity extends IOIOActivity {
     private SystemUiHider mSystemUiHider;
 
     private Button button_;
+    private DigitalOutput redLedOne_;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -193,6 +194,7 @@ public class MainScreenActivity extends IOIOActivity {
         protected void setup() throws ConnectionLostException {
             showVersions(ioio_, "IOIO connected!");
             led_ = ioio_.openDigitalOutput(0, true);
+            redLedOne_ = ioio_.openDigitalOutput(1, false);
             enableUi(true);
         }
 
@@ -209,6 +211,7 @@ public class MainScreenActivity extends IOIOActivity {
         @Override
         public void loop() throws ConnectionLostException, InterruptedException {
             led_.write(!button_.isPressed());
+            redLedOne_.write(!button_.isPressed());
             Thread.sleep(100);
         }
 

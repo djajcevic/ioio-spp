@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         applicationId "hr.android.djajcevic.solarpanelcontroller"
-        minSdkVersion 15
+        minSdkVersion 8
         targetSdkVersion 21
         versionCode 1
         versionName "1.0"
@@ -39,6 +39,10 @@ project.androidGroovy {
     }
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.android.support:appcompat-v7:22.0.0'
@@ -46,5 +50,7 @@ dependencies {
 
     compile 'org.codehaus.groovy:groovy:2.4.3:grooid'
 
-    compile project(":iOIOLibAccessory")
+    compile 'ioio:AbsoluteEncoderEmulator:1.0'
+    compile 'ioio:iOIOLibAccessory:5.0.4'
+    compile 'ioio:iOIOLibAndroid:5.0.4'
 }
