@@ -2,15 +2,22 @@ package hr.android.djajcevic.solarpanelcontroller;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.SeekBar;
+import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider;
+import hr.djajcevic.spc.hardware.CustomLooper;
+import hr.djajcevic.spc.hardware.LooperDelegate;
+import hr.djajcevic.spc.info.Compass;
 import ioio.lib.api.DigitalOutput;
 import ioio.lib.api.IOIO;
 import ioio.lib.api.exception.ConnectionLostException;
@@ -25,7 +32,7 @@ import ioio.lib.util.android.IOIOActivity;
  *
  * @see hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider
  */
-public class MainScreenActivity extends IOIOActivity {
+public class MainScreenActivity extends IOIOActivity implements LooperDelegate {
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -54,17 +61,20 @@ public class MainScreenActivity extends IOIOActivity {
      */
     private SystemUiHider mSystemUiHider;
 
-    private Button button_;
-    private DigitalOutput redLedOne_;
+    private Compass mCompass;
+
+    private TextView systemMessageTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(hr.android.djajcevic.solarpanelcontroller.R.layout.activity_main_screen);
+        setContentView(R.layout.activity_main_screen);
 
-        final View controlsView = findViewById(hr.android.djajcevic.solarpanelcontroller.R.id.fullscreen_content_controls);
-        final View contentView = findViewById(hr.android.djajcevic.solarpanelcontroller.R.id.fullscreen_content);
+        final View controlsView = findViewById(R.id.fullscreen_content_controls);
+        final View contentView = findViewById(R.id.fullscreen_content);
+
+        systemMessageTextView = (TextView) findViewById(R.id.systemMessageTextView);
 
         // Set up an instance of SystemUiHider to control the system UI for
         // this activity.
@@ -123,8 +133,11 @@ public class MainScreenActivity extends IOIOActivity {
         // Upon interacting with UI controls, delay any scheduled hide()
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
-        findViewById(hr.android.djajcevic.solarpanelcontroller.R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
-        button_ = (Button) findViewById(R.id.button);
+
+        // sensors
+        log("\n");
+        log("Setup sensors...\n");
+        mCompass = new Compass(getWindowManager(), (SensorManager)getSystemService(SENSOR_SERVICE));
     }
 
     @Override
@@ -171,93 +184,13 @@ public class MainScreenActivity extends IOIOActivity {
     }
 
     /**
-     * This is the thread on which all the IOIO activity happens. It will be run
-     * every time the application is resumed and aborted when it is paused. The
-     * method setup() will be called right after a connection with the IOIO has
-     * been established (which might happen several times!). Then, loop() will
-     * be called repetitively until the IOIO gets disconnected.
-     */
-    class Looper extends BaseIOIOLooper {
-        /** The on-board LED. */
-        private DigitalOutput led_;
-
-        /**
-         * Called every time a connection with IOIO has been established.
-         * Typically used to open pins.
-         *
-         * @throws ioio.lib.api.exception.ConnectionLostException
-         *             When IOIO connection is lost.
-         *
-//         * @see ioio.lib.util.IOIOLooper#setup()
-         */
-        @Override
-        protected void setup() throws ConnectionLostException {
-            showVersions(ioio_, "IOIO connected!");
-            led_ = ioio_.openDigitalOutput(0, true);
-            redLedOne_ = ioio_.openDigitalOutput(1, false);
-            enableUi(true);
-        }
-
-        /**
-         * Called repetitively while the IOIO is connected.
-         *
-         * @throws ioio.lib.api.exception.ConnectionLostException
-         *             When IOIO connection is lost.
-         * @throws InterruptedException
-         * 				When the IOIO thread has been interrupted.
-         *
-         * @see ioio.lib.util.IOIOLooper#loop()
-         */
-        @Override
-        public void loop() throws ConnectionLostException, InterruptedException {
-            led_.write(!button_.isPressed());
-            redLedOne_.write(!button_.isPressed());
-            Thread.sleep(100);
-        }
-
-        /**
-         * Called when the IOIO is disconnected.
-         *
-         * @see ioio.lib.util.IOIOLooper#disconnected()
-         */
-        @Override
-        public void disconnected() {
-            enableUi(false);
-            toast("IOIO disconnected");
-        }
-
-        /**
-         * Called when the IOIO is connected, but has an incompatible firmware version.
-         *
-         * @see ioio.lib.util.IOIOLooper#incompatible(ioio.lib.api.IOIO)
-         */
-        @Override
-        public void incompatible() {
-            showVersions(ioio_, "Incompatible firmware version!");
-        }
-    }
-
-    /**
      * A method to create our IOIO thread.
      *
      * @see ioio.lib.util.AbstractIOIOActivity#createIOIOThread()
      */
     @Override
     protected IOIOLooper createIOIOLooper() {
-        return new Looper();
-    }
-
-    private void showVersions(IOIO ioio, String title) {
-        toast(String.format("%s\n" +
-                        "IOIOLib: %s\n" +
-                        "Application firmware: %s\n" +
-                        "Bootloader firmware: %s\n" +
-                        "Hardware: %s",
-                title,
-                ioio.getImplVersion(IOIO.VersionType.IOIOLIB_VER),
-                ioio.getImplVersion(IOIO.VersionType.APP_FIRMWARE_VER),
-                ioio.getImplVersion(IOIO.VersionType.BOOTLOADER_VER),
-                ioio.getImplVersion(IOIO.VersionType.HARDWARE_VER)));
+        return new CustomLooper(this);
     }
 
     private void toast(final String message) {
@@ -270,10 +203,16 @@ public class MainScreenActivity extends IOIOActivity {
         });
     }
 
+    @Override
+    public void showMessage(String message) {
+        toast(message);
+        log(message);
+    }
+
     private int numConnected_ = 0;
 
-    private void enableUi(final boolean enable) {
-        // This is slightly trickier than expected to support a multi-IOIO use-case.
+    @Override
+    public void enableUi(final boolean enable) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -288,5 +227,30 @@ public class MainScreenActivity extends IOIOActivity {
                 }
             }
         });
+    }
+
+    @Override
+    public void loop(CustomLooper looper) throws ConnectionLostException, InterruptedException {
+//        led_.write(!button_.isPressed());
+//        redLedOne_.write(!button_.isPressed());
+        Thread.sleep(1000);
+    }
+
+    @Override
+    protected void onResume() {
+        log("Resuming...\n");
+        super.onResume();
+        mCompass.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        log("Pausing...\n");
+        super.onPause();
+        mCompass.onPause();
+    }
+
+    public void log(String message) {
+        systemMessageTextView.append(message);
     }
 }

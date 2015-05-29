@@ -36,12 +36,16 @@ public class Motor {
     }
 
     public void rotateClockwise(boolean clockwise) throws ConnectionLostException {
+        ioio.beginBatch();
+
         stop();
 
         currentRotationClockwise = clockwise;
         directionPinOutput.write(!currentRotationClockwise);
 
         start();
+
+        ioio.endBatch();
     }
 
     public void start() throws ConnectionLostException {
