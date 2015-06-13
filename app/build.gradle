@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         applicationId "hr.android.djajcevic.solarpanelcontroller"
-        minSdkVersion 8
+        minSdkVersion 17
         targetSdkVersion 21
         versionCode 1
         versionName "1.0"
@@ -27,6 +27,10 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+
+    lintOptions {
+        abortOnError false
     }
 }
 
@@ -45,12 +49,12 @@ repositories {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:22.0.0'
-    compile 'com.android.support:support-v4:22.0.0'
+//    compile 'com.android.support:appcompat-v7:22.0.0'
+//    compile 'com.android.support:support-v4:22.0.0'
 
     compile 'org.codehaus.groovy:groovy:2.4.3:grooid'
 
     compile 'ioio:AbsoluteEncoderEmulator:1.0'
-    compile 'ioio:iOIOLibAccessory:5.0.4'
+    compile 'ioio:iOIOLibBT:5.0.4'
     compile 'ioio:iOIOLibAndroid:5.0.4'
 }

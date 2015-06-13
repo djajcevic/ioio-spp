@@ -34,7 +34,7 @@ public class CustomLooper extends BaseIOIOLooper {
      */
     @Override
     protected void setup() throws ConnectionLostException {
-        delegate.showMessage("\n" + showVersions(ioio_, "IOIO connected!"));
+        delegate.showMessage("\n" + showVersions(ioio_, "IOIO connected!") + "\n");
 
         led_ = ioio_.openDigitalOutput(IOIO.LED_PIN, true);
 
@@ -53,9 +53,7 @@ public class CustomLooper extends BaseIOIOLooper {
      */
     @Override
     public void loop() throws ConnectionLostException, InterruptedException {
-        led_.write(true);
         delegate.loop(this);
-        led_.write(false);
     }
 
     /**
@@ -65,8 +63,8 @@ public class CustomLooper extends BaseIOIOLooper {
      */
     @Override
     public void disconnected() {
-        delegate.enableUi(false);
         delegate.showMessage("\nIOIO disconnected\n");
+        delegate.enableUi(false);
     }
 
     /**
@@ -76,19 +74,25 @@ public class CustomLooper extends BaseIOIOLooper {
      */
     @Override
     public void incompatible() {
-        delegate.showMessage("\n" + showVersions(ioio_, "Incompatible firmware version!"));
+        delegate.showMessage("\n" + showVersions(ioio_, "Incompatible firmware version!") + "\n");
     }
 
     private String showVersions(IOIO ioio, String title) {
         return String.format("%s\n" +
-                        "IOIOLib: %s\n" +
-                        "Application firmware: %s\n" +
-                        "Bootloader firmware: %s\n" +
-                        "Hardware: %s",
+                        "==================================\n" +
+                        "IOIOLib: %25s\n" +
+                        "Application firmware: %12s\n" +
+                        "Bootloader firmware: %13s\n" +
+                        "Hardware: %24s\n" +
+                        "==================================\n",
                 title,
                 ioio.getImplVersion(IOIO.VersionType.IOIOLIB_VER),
                 ioio.getImplVersion(IOIO.VersionType.APP_FIRMWARE_VER),
                 ioio.getImplVersion(IOIO.VersionType.BOOTLOADER_VER),
                 ioio.getImplVersion(IOIO.VersionType.HARDWARE_VER));
+    }
+
+    public DigitalOutput getLed() {
+        return led_;
     }
 }

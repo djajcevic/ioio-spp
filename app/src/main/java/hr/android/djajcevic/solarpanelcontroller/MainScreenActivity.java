@@ -1,27 +1,31 @@
 package hr.android.djajcevic.solarpanelcontroller;
 
 import android.annotation.TargetApi;
+import android.app.Service;
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.GpsStatus;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.Button;
-import android.widget.SeekBar;
-import android.widget.Switch;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider;
+import hr.djajcevic.spc.hardware.CompassDelegate;
 import hr.djajcevic.spc.hardware.CustomLooper;
 import hr.djajcevic.spc.hardware.LooperDelegate;
-import hr.djajcevic.spc.info.Compass;
-import ioio.lib.api.DigitalOutput;
-import ioio.lib.api.IOIO;
+import hr.djajcevic.spc.hardware.Compass;
 import ioio.lib.api.exception.ConnectionLostException;
-import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
 
@@ -32,155 +36,41 @@ import ioio.lib.util.android.IOIOActivity;
  *
  * @see hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider
  */
-public class MainScreenActivity extends IOIOActivity implements LooperDelegate {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
-    private static final boolean AUTO_HIDE = true;
-
-    /**
-     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-     * user interaction before hiding the system UI.
-     */
-    private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
-
-    /**
-     * If set, will toggle the system UI visibility upon interaction. Otherwise,
-     * will show the system UI visibility upon interaction.
-     */
-    private static final boolean TOGGLE_ON_CLICK = true;
-
-    /**
-     * The flags to pass to {@link hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider#getInstance}.
-     */
-    private static final int HIDER_FLAGS = SystemUiHider.FLAG_HIDE_NAVIGATION;
-
-    /**
-     * The instance of the {@link hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider} for this activity.
-     */
-    private SystemUiHider mSystemUiHider;
+public class MainScreenActivity extends IOIOActivity implements LooperDelegate, CompassDelegate, GpsStatus.Listener, LocationListener {
 
     private Compass mCompass;
 
     private TextView systemMessageTextView;
+    private TextView sunAzimuthTextView;
+    private LocationManager locationService;
+    private TextView sunHeightTextView;
+    private CustomLooper customLooper;
+    private ScrollView systemMessageTextViewScrollView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        final View contentView = findViewById(R.id.frameLayout);
+
         setContentView(R.layout.activity_main_screen);
 
-        final View controlsView = findViewById(R.id.fullscreen_content_controls);
-        final View contentView = findViewById(R.id.fullscreen_content);
-
         systemMessageTextView = (TextView) findViewById(R.id.systemMessageTextView);
-
-        // Set up an instance of SystemUiHider to control the system UI for
-        // this activity.
-        mSystemUiHider = SystemUiHider.getInstance(this, contentView, HIDER_FLAGS);
-        mSystemUiHider.setup();
-        mSystemUiHider
-                .setOnVisibilityChangeListener(new SystemUiHider.OnVisibilityChangeListener() {
-                    // Cached values.
-                    int mControlsHeight;
-                    int mShortAnimTime;
-
-                    @Override
-                    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
-                    public void onVisibilityChange(boolean visible) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
-                            // If the ViewPropertyAnimator API is available
-                            // (Honeycomb MR2 and later), use it to animate the
-                            // in-layout UI controls at the bottom of the
-                            // screen.
-                            if (mControlsHeight == 0) {
-                                mControlsHeight = controlsView.getHeight();
-                            }
-                            if (mShortAnimTime == 0) {
-                                mShortAnimTime = getResources().getInteger(
-                                        android.R.integer.config_shortAnimTime);
-                            }
-                            controlsView.animate()
-                                    .translationY(visible ? 0 : mControlsHeight)
-                                    .setDuration(mShortAnimTime);
-                        } else {
-                            // If the ViewPropertyAnimator APIs aren't
-                            // available, simply show or hide the in-layout UI
-                            // controls.
-                            controlsView.setVisibility(visible ? View.VISIBLE : View.GONE);
-                        }
-
-                        if (visible && AUTO_HIDE) {
-                            // Schedule a hide().
-                            delayedHide(AUTO_HIDE_DELAY_MILLIS);
-                        }
-                    }
-                });
-
-        // Set up the user interaction to manually show or hide the system UI.
-        contentView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (TOGGLE_ON_CLICK) {
-                    mSystemUiHider.toggle();
-                } else {
-                    mSystemUiHider.show();
-                }
-            }
-        });
-
-        // Upon interacting with UI controls, delay any scheduled hide()
-        // operations to prevent the jarring behavior of controls going away
-        // while interacting with the UI.
+        sunAzimuthTextView = (TextView) findViewById(R.id.sunAzimuthTextView);
+        sunHeightTextView = (TextView) findViewById(R.id.sunHeightTextView);
+        systemMessageTextViewScrollView = (ScrollView) findViewById(R.id.systemMessageTextViewScrollView);
 
         // sensors
         log("\n");
         log("Setup sensors...\n");
-        mCompass = new Compass(getWindowManager(), (SensorManager)getSystemService(SENSOR_SERVICE));
-    }
-
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-
-        // Trigger the initial hide() shortly after the activity has been
-        // created, to briefly hint to the user that UI controls
-        // are available.
-        delayedHide(100);
-    }
-
-
-    /**
-     * Touch listener to use for in-layout UI controls to delay hiding the
-     * system UI. This is to prevent the jarring behavior of controls going away
-     * while interacting with activity UI.
-     */
-    View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            if (AUTO_HIDE) {
-                delayedHide(AUTO_HIDE_DELAY_MILLIS);
-            }
-            return false;
-        }
-    };
-
-    Handler mHideHandler = new Handler();
-    Runnable mHideRunnable = new Runnable() {
-        @Override
-        public void run() {
-            mSystemUiHider.hide();
-        }
-    };
-
-    /**
-     * Schedules a call to hide() in [delay] milliseconds, canceling any
-     * previously scheduled calls.
-     */
-    private void delayedHide(int delayMillis) {
-        mHideHandler.removeCallbacks(mHideRunnable);
-        mHideHandler.postDelayed(mHideRunnable, delayMillis);
+        SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        mCompass = new Compass(getWindowManager(), sensorManager);
+        mCompass.setDelegate(this);
+        locationService = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locationService.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this);
+        boolean b = locationService.addGpsStatusListener(this);
+//        log("\nRegistered GPS listener? " + b);
+        customLooper = new CustomLooper(this);
     }
 
     /**
@@ -190,7 +80,7 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate {
      */
     @Override
     protected IOIOLooper createIOIOLooper() {
-        return new CustomLooper(this);
+        return customLooper;
     }
 
     private void toast(final String message) {
@@ -198,15 +88,15 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+//                Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+                log(message);
             }
         });
     }
 
     @Override
-    public void showMessage(String message) {
+    public synchronized void showMessage(String message) {
         toast(message);
-        log(message);
     }
 
     private int numConnected_ = 0;
@@ -233,24 +123,67 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate {
     public void loop(CustomLooper looper) throws ConnectionLostException, InterruptedException {
 //        led_.write(!button_.isPressed());
 //        redLedOne_.write(!button_.isPressed());
+        looper.getLed().write(true);
+        Thread.sleep(1000);
+        looper.getLed().write(false);
         Thread.sleep(1000);
     }
 
     @Override
     protected void onResume() {
-        log("Resuming...\n");
+        toast("Resuming...\n");
         super.onResume();
         mCompass.onResume();
     }
 
     @Override
     protected void onPause() {
-        log("Pausing...\n");
+        toast("Pausing...\n");
         super.onPause();
         mCompass.onPause();
     }
 
     public void log(String message) {
         systemMessageTextView.append(message);
+        systemMessageTextViewScrollView.post(new Runnable() {
+
+            @Override
+            public void run() {
+                systemMessageTextViewScrollView.fullScroll(ScrollView.FOCUS_DOWN);
+            }
+        });
+    }
+
+    @Override
+    public void compassUpdated(Compass compass) {
+        sunAzimuthTextView.setText(Math.round(compass.getAzimuth()) + "°");
+    }
+
+    @Override
+    public void onGpsStatusChanged(int event) {
+        GpsStatus gpsStatus = locationService.getGpsStatus(null);
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+//        String gpsProvider = LocationManager.GPS_PROVIDER;
+//        GpsStatus gpsStatus = locationService.getGpsStatus(null);
+
+        sunHeightTextView.setText(location.getLongitude() + "° / "  + location.getLatitude() + "°");
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
     }
 }

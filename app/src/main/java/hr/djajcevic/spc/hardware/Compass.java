@@ -1,4 +1,4 @@
-package hr.djajcevic.spc.info;
+package hr.djajcevic.spc.hardware;
 
 import android.graphics.Color;
 import android.hardware.Sensor;
@@ -13,6 +13,8 @@ import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.SeekBar;
 import android.widget.TextView;
+
+import hr.djajcevic.spc.hardware.CompassDelegate;
 
 /**
  * Created by djajcevic on 29.05.15..
@@ -33,6 +35,8 @@ public class Compass implements SensorEventListener {
     private float[] orientationData = new float[3];
     private float azimuth;
 
+    private CompassDelegate delegate;
+
     public Compass(final WindowManager windowManager, final SensorManager sensorManager) {
         this.windowManager = windowManager;
         this.sensorManager = sensorManager;
@@ -45,8 +49,8 @@ public class Compass implements SensorEventListener {
     }
 
     public void onResume() {
-        sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
-        sensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_UI);
+        sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     public void onPause() {
@@ -68,7 +72,11 @@ public class Compass implements SensorEventListener {
         configureDeviceAngle();
 
         SensorManager.getOrientation(rotationMatrix, orientationData);
-        azimuth = (float) Math.toDegrees(orientationData[0]);
+        float newValue = (float) Math.toDegrees(orientationData[0]);
+        if ((int)Math.abs(newValue - azimuth) >= 1) {
+            azimuth = newValue;
+        }
+        delegate.compassUpdated(this);
     }
 
     private void configureDeviceAngle() {
@@ -94,6 +102,10 @@ public class Compass implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
+    }
+
+    public void setDelegate(CompassDelegate delegate) {
+        this.delegate = delegate;
     }
 
     public float getNorthOnAzimuth() {
