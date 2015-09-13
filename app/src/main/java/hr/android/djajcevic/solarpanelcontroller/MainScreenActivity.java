@@ -17,14 +17,31 @@ import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
 import hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider;
+import hr.djajcevic.spc.SolarPanelController;
+import hr.djajcevic.spc.SolarPanelControllerImpl;
+import hr.djajcevic.spc.calculator.SunPositionData;
 import hr.djajcevic.spc.hardware.CompassDelegate;
 import hr.djajcevic.spc.hardware.CustomLooper;
 import hr.djajcevic.spc.hardware.LooperDelegate;
 import hr.djajcevic.spc.hardware.Compass;
+import hr.djajcevic.spc.ioio.looper.compas.CompassData;
+import hr.djajcevic.spc.ioio.looper.exception.SystemException;
+import hr.djajcevic.spc.ioio.looper.gps.GPSData;
+import hr.djajcevic.spc.ioio.looper.process.SystemManager;
+import hr.djajcevic.spc.ioio.looper.process.SystemManagerListener;
+import hr.djajcevic.spc.util.Configuration;
+import ioio.lib.api.IOIO;
 import ioio.lib.api.exception.ConnectionLostException;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
@@ -36,16 +53,27 @@ import ioio.lib.util.android.IOIOActivity;
  *
  * @see hr.android.djajcevic.solarpanelcontroller.util.SystemUiHider
  */
-public class MainScreenActivity extends IOIOActivity implements LooperDelegate, CompassDelegate, GpsStatus.Listener, LocationListener {
+public class MainScreenActivity extends IOIOActivity implements LooperDelegate, SystemManagerListener, SystemManager.Delegate {
 
     private Compass mCompass;
 
     private TextView systemMessageTextView;
+    private TextView sunriseTextView;
+    private TextView sunsetTextView;
+    private TextView headingTextView;
     private TextView sunAzimuthTextView;
+    private TextView horizontalAxisTextView;
+    private TextView verticalAxisTextView;
     private LocationManager locationService;
     private TextView sunHeightTextView;
     private CustomLooper customLooper;
     private ScrollView systemMessageTextViewScrollView;
+
+    private static DateFormat dateFormat = new SimpleDateFormat("dd.mm.yyyy HH:MM:ss");
+
+    SystemManager systemManager;
+    private Switch sleepSwitch;
+    private Switch systemCheckMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,21 +84,31 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate, 
         setContentView(R.layout.activity_main_screen);
 
         systemMessageTextView = (TextView) findViewById(R.id.systemMessageTextView);
+        sunriseTextView = (TextView) findViewById(R.id.sunriseTextView);
+        sunsetTextView = (TextView) findViewById(R.id.sunsetTextView);
+        headingTextView = (TextView) findViewById(R.id.headingTextView);
         sunAzimuthTextView = (TextView) findViewById(R.id.sunAzimuthTextView);
         sunHeightTextView = (TextView) findViewById(R.id.sunHeightTextView);
+        horizontalAxisTextView = (TextView) findViewById(R.id.horizontalAxisTextView);
+        verticalAxisTextView = (TextView) findViewById(R.id.verticalAxisTextView);
         systemMessageTextViewScrollView = (ScrollView) findViewById(R.id.systemMessageTextViewScrollView);
+
+        sleepSwitch = (Switch) findViewById(R.id.sleepSwitch);
+        systemCheckMode = (Switch) findViewById(R.id.systemCheckMode);
 
         // sensors
         log("\n");
-        log("Setup sensors...\n");
-        SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        mCompass = new Compass(getWindowManager(), sensorManager);
-        mCompass.setDelegate(this);
-        locationService = (LocationManager) getSystemService(LOCATION_SERVICE);
-        locationService.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this);
-        boolean b = locationService.addGpsStatusListener(this);
-//        log("\nRegistered GPS listener? " + b);
-        customLooper = new CustomLooper(this);
+
+        log("Setup controller...\n");
+        try {
+            Configuration.initialize(getApplicationContext().getAssets().open("configuration.properties"), getApplicationContext().getAssets().open("status.properties"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        systemManager = new SystemManager();
+        systemManager.getListeners().add(this);
+        systemManager.setDelegate(this);
+
     }
 
     /**
@@ -80,7 +118,7 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate, 
      */
     @Override
     protected IOIOLooper createIOIOLooper() {
-        return customLooper;
+        return systemManager;
     }
 
     private void toast(final String message) {
@@ -123,67 +161,157 @@ public class MainScreenActivity extends IOIOActivity implements LooperDelegate, 
     public void loop(CustomLooper looper) throws ConnectionLostException, InterruptedException {
 //        led_.write(!button_.isPressed());
 //        redLedOne_.write(!button_.isPressed());
-        looper.getLed().write(true);
-        Thread.sleep(1000);
-        looper.getLed().write(false);
-        Thread.sleep(1000);
+        systemManager.loop();
+        Thread.sleep(10000);
     }
 
     @Override
     protected void onResume() {
         toast("Resuming...\n");
         super.onResume();
-        mCompass.onResume();
     }
 
     @Override
     protected void onPause() {
         toast("Pausing...\n");
         super.onPause();
-        mCompass.onPause();
     }
 
-    public void log(String message) {
-        systemMessageTextView.append(message);
-        systemMessageTextViewScrollView.post(new Runnable() {
+    public synchronized void log(final String message, final boolean flush) {
+        if (message == null) {
+            return;
+        }
+        System.out.println("MESSAGE: " + message);
+        this.runOnUiThread(new Runnable() {
 
             @Override
             public void run() {
-                systemMessageTextViewScrollView.fullScroll(ScrollView.FOCUS_DOWN);
+                if (flush) {
+                    systemMessageTextView.setText("");
+                }
+                systemMessageTextView.append(dateFormat.format(new Date()) + ": \n" + message + "\n");
+                systemMessageTextViewScrollView.post(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        systemMessageTextViewScrollView.fullScroll(ScrollView.FOCUS_DOWN);
+                    }
+                });
+            }
+        });
+    }
+
+    public synchronized void log(final String message) {
+        log(message, false);
+    }
+
+    @Override
+    public void boardConnected(IOIO ioio) {
+        log("IOIO connected");
+
+    }
+
+    @Override
+    public void boardDisconnected() {
+        log("IOIO disconnected");
+    }
+
+    @Override
+    public void incompatibleBoard(IOIO ioio) {
+        log("IOIO incompatible");
+    }
+
+    @Override
+    public void xAxisStepCompleted(final int i) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                horizontalAxisTextView.setText(i + "°");
             }
         });
     }
 
     @Override
-    public void compassUpdated(Compass compass) {
-        sunAzimuthTextView.setText(Math.round(compass.getAzimuth()) + "°");
+    public void yAxisStepCompleted(final int i) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                verticalAxisTextView.setText(i + "°");
+            }
+        });
     }
 
     @Override
-    public void onGpsStatusChanged(int event) {
-        GpsStatus gpsStatus = locationService.getGpsStatus(null);
+    public void xAxisReachedStartPosition() {
+//        log("Reached start X position");
     }
 
     @Override
-    public void onLocationChanged(Location location) {
-//        String gpsProvider = LocationManager.GPS_PROVIDER;
-//        GpsStatus gpsStatus = locationService.getGpsStatus(null);
-
-        sunHeightTextView.setText(location.getLongitude() + "° / "  + location.getLatitude() + "°");
+    public void yAxisReachedStartPosition() {
+//        log("Reached start Y position");
     }
 
     @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
+    public void xAxisReachedEndPosition() {
+//        log("Reached end X position");
     }
 
     @Override
-    public void onProviderEnabled(String provider) {
-
+    public void yAxisReachedEndPosition() {
+//        log("Reached end Y position");
     }
 
     @Override
-    public void onProviderDisabled(String provider) {
+    public void gpsPositionLocked(GPSData gpsData) {
+        final SunPositionData sunPositionData = systemManager.getSunPositionData();
+        if (sunPositionData != null) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Calendar sunriseCalendar = sunPositionData.sunriseCalendar;
+                    if (sunriseCalendar != null) {
+                        sunriseTextView.setText(String.format("%02d:%02dh",sunriseCalendar.get(Calendar.HOUR_OF_DAY), sunriseCalendar.get(Calendar.MINUTE)));
+                    }
+                    Calendar sunsetCalendar = sunPositionData.sunsetCalendar;
+                    if (sunsetCalendar != null) {
+                        sunsetTextView.setText(String.format("%02d:%02dh", sunsetCalendar.get(Calendar.HOUR_OF_DAY), sunsetCalendar.get(Calendar.MINUTE)));
+                    }
+                    sunAzimuthTextView.setText((int) sunPositionData.azimuth + "°");
+                    sunHeightTextView.setText((int) (90 - sunPositionData.zenith) + "°");
+                }
+            });
+        }
+    }
 
+    @Override
+    public void compassDataReady(final CompassData compassData) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                headingTextView.setText((compassData.getHeadingDegrees().intValue()) + "°");
+            }
+        });
+    }
+
+    @Override
+    public void systemError(Exception e) {
+//        log(e.getMessage());
+    }
+
+    @Override
+    public void performingParkDueTo(SystemException e) {
+//        log(e.getMessage());
+    }
+
+    @Override
+    public void message(String s) {
+        log(s);
+    }
+
+    @Override
+    public void beforeLoop(SystemManager systemManager) {
+        log("Performing management", true);
+        systemManager.setSleepOn(sleepSwitch.isChecked());
+        systemManager.setSystemCheckModeOn(systemCheckMode.isChecked());
     }
 }

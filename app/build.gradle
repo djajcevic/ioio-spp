@@ -54,7 +54,9 @@ dependencies {
 
     compile 'org.codehaus.groovy:groovy:2.4.3:grooid'
 
-    compile 'ioio:AbsoluteEncoderEmulator:1.0'
+    compile ('ioio:SolarPanelController:1.0') {
+        exclude module: 'iOIOLibPC'
+    }
     compile 'ioio:iOIOLibBT:5.0.4'
     compile 'ioio:iOIOLibAndroid:5.0.4'
 }
